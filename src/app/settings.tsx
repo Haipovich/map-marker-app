@@ -36,6 +36,7 @@ export default function SettingsScreen() {
         );
       }
     } catch (error) {
+      console.error('Toggle notifications error', error);
       Alert.alert('Не удалось сохранить настройку', getUserMessage(error));
     }
   };

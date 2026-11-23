@@ -26,12 +26,23 @@ export function configureNotificationHandler(): void {
   });
 }
 
+let channelReady = false;
+
 export async function ensureNotificationChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(NEARBY_CHANNEL_ID, {
-    name: 'Маркеры рядом',
-    importance: Notifications.AndroidImportance.HIGH,
-  });
+  if (Platform.OS !== 'android' || channelReady) return;
+  try {
+    await Notifications.setNotificationChannelAsync(NEARBY_CHANNEL_ID, {
+      name: 'Маркеры рядом',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#208AEF',
+    });
+    channelReady = true;
+  } catch (e) {
+    console.warn('Notification channel error', e);
+  }
 }
 
 export async function readNotificationPermission(): Promise<NotificationPermission> {
