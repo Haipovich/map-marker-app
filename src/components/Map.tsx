@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
@@ -14,13 +14,40 @@ const INITIAL_REGION = {
   longitudeDelta: 30,
 };
 
+const FOCUS_DELTA = 0.01;
+const FOCUS_DURATION_MS = 600;
 const LOAD_TIMEOUT_MS = 15_000;
 
 type MapStatus = 'loading' | 'ready' | 'error';
 
-export function MarkersMap({ markers, onAddMarker, onMarkerPress }: MarkersMapProps) {
+export function MarkersMap({
+  markers,
+  onAddMarker,
+  onMarkerPress,
+  showsUserLocation = false,
+  ref,
+}: MarkersMapProps) {
   const [status, setStatus] = useState<MapStatus>('loading');
   const [attempt, setAttempt] = useState(0);
+  const mapRef = useRef<MapView>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      centerOn: (coordinate: Coordinates) => {
+        mapRef.current?.animateToRegion(
+          {
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            latitudeDelta: FOCUS_DELTA,
+            longitudeDelta: FOCUS_DELTA,
+          },
+          FOCUS_DURATION_MS,
+        );
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -46,8 +73,11 @@ export function MarkersMap({ markers, onAddMarker, onMarkerPress }: MarkersMapPr
     <View style={styles.container}>
       <MapView
         key={attempt}
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={INITIAL_REGION}
+        showsUserLocation={showsUserLocation}
+        showsMyLocationButton={false}
         onMapReady={() => setStatus('ready')}
         onLongPress={handleLongPress}>
         {markers.map((marker) => (

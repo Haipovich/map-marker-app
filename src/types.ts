@@ -1,3 +1,5 @@
+import type { Ref } from 'react';
+
 export interface Coordinates {
   latitude: number;
   longitude: number;
@@ -37,8 +39,14 @@ export type MarkerRouteParams = {
   id: string;
 };
 
+export interface MarkersMapHandle {
+  centerOn: (coordinate: Coordinates) => void;
+}
+
 export interface MarkersMapProps {
   markers: Marker[];
   onAddMarker: (coordinate: Coordinates) => void;
   onMarkerPress: (markerId: number) => void;
+  showsUserLocation?: boolean;
+  ref?: Ref<MarkersMapHandle>;
 }

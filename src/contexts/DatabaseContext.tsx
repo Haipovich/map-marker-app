@@ -19,6 +19,8 @@ import {
   selectMarker,
   selectMarkerImages,
   selectMarkers,
+  selectSetting,
+  upsertSetting,
 } from '@/database/operations';
 import { DatabaseError, toDatabaseError } from '@/database/errors';
 import { logDb } from '@/database/logger';
@@ -34,11 +36,15 @@ interface DatabaseContextType {
   addImages: (markerId: number, uris: string[]) => Promise<void>;
   deleteImage: (id: number) => Promise<void>;
   getMarkerImages: (markerId: number) => Promise<MarkerImage[]>;
+  getSetting: (key: string) => Promise<string | null>;
+  setSetting: (key: string, value: string) => Promise<void>;
   retry: () => void;
   reset: () => Promise<void>;
   isLoading: boolean;
   error: Error | null;
 }
+
+type DatabaseApi = Omit<DatabaseContextType, 'retry' | 'reset' | 'isLoading' | 'error'>;
 
 const DatabaseContext = createContext<DatabaseContextType | null>(null);
 
@@ -127,7 +133,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const value = useMemo<DatabaseContextType>(
+  const api = useMemo<DatabaseApi>(
     () => ({
       addMarker: (latitude, longitude) => run((db) => insertMarker(db, latitude, longitude)),
       deleteMarker: (id) => run((db) => removeMarker(db, id)),
@@ -137,12 +143,21 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
       addImages: (markerId, uris) => run((db) => insertImages(db, markerId, uris)),
       deleteImage: (id) => run((db) => removeImage(db, id)),
       getMarkerImages: (markerId) => run((db) => selectMarkerImages(db, markerId)),
+      getSetting: (key) => run((db) => selectSetting(db, key)),
+      setSetting: (key, value) => run((db) => upsertSetting(db, key, value)),
+    }),
+    [run],
+  );
+
+  const value = useMemo<DatabaseContextType>(
+    () => ({
+      ...api,
       retry,
       reset,
       isLoading: isLoading || (!isReady && error === null),
       error,
     }),
-    [run, retry, reset, isLoading, isReady, error],
+    [api, retry, reset, isLoading, isReady, error],
   );
 
   return <DatabaseContext.Provider value={value}>{children}</DatabaseContext.Provider>;

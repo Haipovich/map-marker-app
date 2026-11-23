@@ -10,9 +10,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useDatabase } from '@/contexts/DatabaseContext';
+import { useLocation } from '@/contexts/LocationContext';
 import { DatabaseError, getUserMessage } from '@/database/errors';
 import type { Marker, MarkerImage, MarkerRouteParams } from '@/types';
 import { formatDbDate, markerTitle } from '@/utils/format';
+import { distanceMeters, formatDistance } from '@/utils/geo';
 import { deleteStoredImage, persistImage } from '@/utils/image-storage';
 
 type Status = 'loading' | 'ready' | 'missing' | 'error';
@@ -33,6 +35,7 @@ export default function MarkerDetailsScreen() {
   const validId = Number.isInteger(markerId) && markerId > 0;
 
   const { getMarker, getMarkerImages, addImages, deleteImage, deleteMarker } = useDatabase();
+  const { position } = useLocation();
   const [marker, setMarker] = useState<Marker | null>(null);
   const [images, setImages] = useState<MarkerImage[]>([]);
   const [status, setStatus] = useState<Status>('loading');
@@ -192,6 +195,11 @@ export default function MarkerDetailsScreen() {
         <ThemedText type="small" themeColor="textSecondary">
           Создан: {formatDbDate(marker.createdAt)}
         </ThemedText>
+        {position && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Расстояние до вас: {formatDistance(distanceMeters(position, marker))}
+          </ThemedText>
+        )}
       </ThemedView>
 
       <Pressable onPress={handleAddImage} style={styles.primaryButton}>

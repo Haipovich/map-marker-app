@@ -39,7 +39,13 @@
           "photosPermission": "Приложению нужен доступ к фото, чтобы прикреплять изображения к маркерам."
         }
       ],
-      "expo-sqlite"
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Приложению нужен доступ к геолокации, чтобы показывать ваше положение на карте и расстояние до маркеров."
+        }
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

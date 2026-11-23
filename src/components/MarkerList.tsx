@@ -3,15 +3,17 @@ import { FlatList, Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import type { Coordinates, Marker } from '@/types';
 import { markerTitle } from '@/utils/format';
-import type { Marker } from '@/types';
+import { distanceMeters, formatDistance } from '@/utils/geo';
 
 interface MarkerListProps {
   markers: Marker[];
+  userPosition: Coordinates | null;
   onSelect: (markerId: number) => void;
 }
 
-export function MarkerList({ markers, onSelect }: MarkerListProps) {
+export function MarkerList({ markers, userPosition, onSelect }: MarkerListProps) {
   if (markers.length === 0) return null;
 
   return (
@@ -28,6 +30,11 @@ export function MarkerList({ markers, onSelect }: MarkerListProps) {
             <ThemedText type="small" themeColor="textSecondary">
               Фото: {item.imageCount}
             </ThemedText>
+            {userPosition && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {formatDistance(distanceMeters(userPosition, item))}
+              </ThemedText>
+            )}
           </ThemedView>
         </Pressable>
       )}
