@@ -3,11 +3,12 @@ import { FlatList, Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import type { MarkerData } from '@/types';
+import { markerTitle } from '@/utils/format';
+import type { Marker } from '@/types';
 
 interface MarkerListProps {
-  markers: MarkerData[];
-  onSelect: (markerId: string) => void;
+  markers: Marker[];
+  onSelect: (markerId: number) => void;
 }
 
 export function MarkerList({ markers, onSelect }: MarkerListProps) {
@@ -16,16 +17,16 @@ export function MarkerList({ markers, onSelect }: MarkerListProps) {
   return (
     <FlatList
       data={markers}
-      keyExtractor={(m) => m.id}
+      keyExtractor={(m) => String(m.id)}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.content}
       renderItem={({ item }) => (
         <Pressable onPress={() => onSelect(item.id)}>
           <ThemedView type="backgroundElement" style={styles.chip}>
-            <ThemedText type="smallBold">{item.title}</ThemedText>
+            <ThemedText type="smallBold">{markerTitle(item.id)}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Фото: {item.images.length}
+              Фото: {item.imageCount}
             </ThemedText>
           </ThemedView>
         </Pressable>

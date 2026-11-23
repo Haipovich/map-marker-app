@@ -38,7 +38,8 @@
         {
           "photosPermission": "Приложению нужен доступ к фото, чтобы прикреплять изображения к маркерам."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

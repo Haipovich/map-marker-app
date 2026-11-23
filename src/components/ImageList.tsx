@@ -12,7 +12,7 @@ const PADDING = Spacing.three;
 
 interface ImageListProps {
   images: MarkerImage[];
-  onDelete: (imageId: string) => void;
+  onDelete: (imageId: number) => void;
   onPreview: (image: MarkerImage) => void;
   header?: ReactElement;
 }
@@ -24,7 +24,7 @@ export function ImageList({ images, onDelete, onPreview, header }: ImageListProp
   return (
     <FlatList
       data={images}
-      keyExtractor={(img) => img.id}
+      keyExtractor={(img) => String(img.id)}
       numColumns={COLUMNS}
       ListHeaderComponent={header}
       ListEmptyComponent={

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,8 +9,13 @@ import { ImageList } from '@/components/ImageList';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { createId, useMarkers } from '@/store/markers-context';
-import type { MarkerImage, MarkerRouteParams } from '@/types';
+import { useDatabase } from '@/contexts/DatabaseContext';
+import { DatabaseError, getUserMessage } from '@/database/errors';
+import type { Marker, MarkerImage, MarkerRouteParams } from '@/types';
+import { formatDbDate, markerTitle } from '@/utils/format';
+import { deleteStoredImage, persistImage } from '@/utils/image-storage';
+
+type Status = 'loading' | 'ready' | 'missing' | 'error';
 
 function goToMap() {
   try {
@@ -24,12 +29,47 @@ function goToMap() {
 
 export default function MarkerDetailsScreen() {
   const { id } = useLocalSearchParams<MarkerRouteParams>();
-  const { getMarker, addImages, removeImage, removeMarker } = useMarkers();
+  const markerId = Number(id);
+  const validId = Number.isInteger(markerId) && markerId > 0;
+
+  const { getMarker, getMarkerImages, addImages, deleteImage, deleteMarker } = useDatabase();
+  const [marker, setMarker] = useState<Marker | null>(null);
+  const [images, setImages] = useState<MarkerImage[]>([]);
+  const [status, setStatus] = useState<Status>('loading');
   const [preview, setPreview] = useState<MarkerImage | null>(null);
 
-  const marker = getMarker(id);
+  const load = useCallback(async () => {
+    try {
+      const [loadedMarker, loadedImages] = await Promise.all([
+        getMarker(markerId),
+        getMarkerImages(markerId),
+      ]);
+      if (!loadedMarker) {
+        setMarker(null);
+        setStatus('missing');
+        return;
+      }
+      setMarker(loadedMarker);
+      setImages(loadedImages);
+      setStatus('ready');
+    } catch (error) {
+      console.error('Load marker error', error);
+      setStatus('error');
+    }
+  }, [getMarker, getMarkerImages, markerId]);
 
-  if (!marker) {
+  useFocusEffect(
+    useCallback(() => {
+      if (validId) void load();
+    }, [validId, load]),
+  );
+
+  const handleRetry = () => {
+    setStatus('loading');
+    void load();
+  };
+
+  if (!validId || status === 'missing') {
     return (
       <ThemedView style={styles.center}>
         <Stack.Screen options={{ title: 'Маркер не найден' }} />
@@ -46,36 +86,74 @@ export default function MarkerDetailsScreen() {
     );
   }
 
+  if (status === 'error') {
+    return (
+      <ThemedView style={styles.center}>
+        <ThemedText type="smallBold">Не удалось загрузить маркер</ThemedText>
+        <Pressable onPress={handleRetry} style={styles.primaryButton}>
+          <ThemedText type="smallBold" style={styles.primaryText}>
+            Повторить
+          </ThemedText>
+        </Pressable>
+      </ThemedView>
+    );
+  }
+
+  if (!marker) {
+    return <ThemedView style={styles.center} />;
+  }
+
   const handleAddImage = async () => {
+    let result: ImagePicker.ImagePickerResult;
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
+      result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsMultipleSelection: true,
         selectionLimit: 10,
         quality: 0.8,
       });
-      if (result.canceled) return;
-
-      addImages(
-        marker.id,
-        result.assets.map((asset) => ({
-          id: createId(),
-          uri: asset.uri,
-          width: asset.width,
-          height: asset.height,
-          addedAt: Date.now(),
-        })),
-      );
     } catch (error) {
       console.error('Image picker error', error);
       Alert.alert('Ошибка выбора изображения', 'Не удалось открыть галерею или загрузить фото.');
+      return;
+    }
+
+    if (result.canceled) return;
+
+    const saved: string[] = [];
+    try {
+      for (const asset of result.assets) {
+        saved.push(await persistImage(asset.uri));
+      }
+      await addImages(marker.id, saved);
+      await load();
+    } catch (error) {
+      saved.forEach(deleteStoredImage);
+      Alert.alert(
+        'Не удалось сохранить изображения',
+        error instanceof DatabaseError ? getUserMessage(error) : 'Не удалось скопировать файлы изображений.',
+      );
     }
   };
 
-  const handleDeleteImage = (imageId: string) => {
+  const handleDeleteImage = (imageId: number) => {
     Alert.alert('Удалить изображение?', 'Это действие нельзя отменить.', [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Удалить', style: 'destructive', onPress: () => removeImage(marker.id, imageId) },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          const target = images.find((img) => img.id === imageId);
+          try {
+            await deleteImage(imageId);
+            if (target) deleteStoredImage(target.uri);
+            await load();
+          } catch (error) {
+            Alert.alert('Не удалось удалить изображение', getUserMessage(error));
+            await load();
+          }
+        },
+      },
     ]);
   };
 
@@ -85,26 +163,34 @@ export default function MarkerDetailsScreen() {
       {
         text: 'Удалить',
         style: 'destructive',
-        onPress: () => {
-          goToMap();
-          removeMarker(marker.id);
+        onPress: async () => {
+          const uris = images.map((img) => img.uri);
+          try {
+            await deleteMarker(marker.id);
+            uris.forEach(deleteStoredImage);
+            goToMap();
+          } catch (error) {
+            Alert.alert('Не удалось удалить маркер', getUserMessage(error));
+          }
         },
       },
     ]);
   };
 
+  const title = markerTitle(marker.id);
+
   const header = (
     <ThemedView style={styles.header}>
       <ThemedView type="backgroundElement" style={styles.infoCard}>
-        <ThemedText type="smallBold">{marker.title}</ThemedText>
+        <ThemedText type="smallBold">{title}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          Широта: {marker.coordinate.latitude.toFixed(5)}
+          Широта: {marker.latitude.toFixed(5)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          Долгота: {marker.coordinate.longitude.toFixed(5)}
+          Долгота: {marker.longitude.toFixed(5)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          Создан: {new Date(marker.createdAt).toLocaleString('ru-RU')}
+          Создан: {formatDbDate(marker.createdAt)}
         </ThemedText>
       </ThemedView>
 
@@ -118,14 +204,9 @@ export default function MarkerDetailsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: marker.title }} />
+      <Stack.Screen options={{ title }} />
 
-      <ImageList
-        images={marker.images}
-        onDelete={handleDeleteImage}
-        onPreview={setPreview}
-        header={header}
-      />
+      <ImageList images={images} onDelete={handleDeleteImage} onPreview={setPreview} header={header} />
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         <Pressable onPress={handleDeleteMarker} style={styles.dangerButton}>

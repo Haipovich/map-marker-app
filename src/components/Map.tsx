@@ -53,7 +53,7 @@ export function MarkersMap({ markers, onAddMarker, onMarkerPress }: MarkersMapPr
         {markers.map((marker) => (
           <Marker
             key={marker.id}
-            coordinate={marker.coordinate}
+            coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
             onPress={() => onMarkerPress(marker.id)}
             tracksViewChanges={false}
           />

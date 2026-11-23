@@ -3,20 +3,34 @@ export interface Coordinates {
   longitude: number;
 }
 
-export interface MarkerImage {
-  id: string;
-  uri: string;
-  width?: number;
-  height?: number;
-  addedAt: number;
+export interface Marker {
+  id: number;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+  imageCount: number;
 }
 
-export interface MarkerData {
-  id: string;
-  title: string;
-  coordinate: Coordinates;
-  createdAt: number;
-  images: MarkerImage[];
+export interface MarkerImage {
+  id: number;
+  markerId: number;
+  uri: string;
+  createdAt: string;
+}
+
+export interface MarkerRow {
+  id: number;
+  latitude: number;
+  longitude: number;
+  created_at: string;
+  image_count: number;
+}
+
+export interface MarkerImageRow {
+  id: number;
+  marker_id: number;
+  uri: string;
+  created_at: string;
 }
 
 export type MarkerRouteParams = {
@@ -24,7 +38,7 @@ export type MarkerRouteParams = {
 };
 
 export interface MarkersMapProps {
-  markers: MarkerData[];
+  markers: Marker[];
   onAddMarker: (coordinate: Coordinates) => void;
-  onMarkerPress: (markerId: string) => void;
+  onMarkerPress: (markerId: number) => void;
 }
